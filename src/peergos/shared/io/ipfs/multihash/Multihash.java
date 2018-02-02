@@ -5,7 +5,7 @@ import peergos.shared.io.ipfs.multibase.*;
 import java.io.*;
 import java.util.*;
 
-public class Multihash {
+public class Multihash implements Comparable<Multihash> {
     public enum Type {
         sha1(0x11, 20),
         sha2_256(0x12, 32),
@@ -44,6 +44,19 @@ public class Multihash {
             throw new IllegalStateException("Incorrect hash length: " + hash.length + " != "+type.length);
         this.type = type;
         this.hash = hash;
+    }
+
+    @Override
+    public int compareTo(Multihash that) {
+        int compare = Integer.compare(this.hash.length, that.hash.length);
+        if (compare != 0)
+            return compare;
+        for (int i = 0; i < this.hash.length; i++) {
+            compare = Byte.compare(this.hash[i], that.hash[i]);
+            if (compare != 0)
+                return compare;
+        }
+        return compare;
     }
 
     public Multihash(Multihash toClone) {

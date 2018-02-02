@@ -161,8 +161,9 @@ public class UserService
         long defaultQuota = args.getLong("default-quota");
         System.out.println("Using default user space quota of " + defaultQuota);
         Path quotaFilePath = Paths.get("quotas.txt");
+        Path usagePath = Paths.get("usage.json");
         UserQuotas userQuotas = new UserQuotas(quotaFilePath, defaultQuota);
-        SpaceCheckingKeyFilter spaceChecker = new SpaceCheckingKeyFilter(coreNode, mutable, dht, userQuotas::quota);
+        SpaceCheckingKeyFilter spaceChecker = new SpaceCheckingKeyFilter(coreNode, mutable, dht, userQuotas::quota, usagePath);
 
         server.createContext(DHT_URL,
                 wrap.apply(new DHTHandler(dht, spaceChecker::allowWrite)));

@@ -5,6 +5,7 @@ import peergos.shared.io.ipfs.multihash.*;
 
 import java.io.*;
 import java.util.*;
+import java.util.function.Function;
 import java.util.stream.*;
 
 import static peergos.shared.cbor.CborConstants.TYPE_BYTE_STRING;
@@ -22,6 +23,7 @@ public interface CborObject extends Cborable {
         serialize(encoder);
         return bout.toByteArray();
     }
+    public interface CborComparable extends CborObject, Comparable {}
 
     @Override
     default CborObject toCbor() {
@@ -103,7 +105,7 @@ public interface CborObject extends Cborable {
         }
     }
 
-    final class CborMap implements CborObject {
+    final class CborMap implements CborObject{
         public final SortedMap<CborObject,? extends Cborable> values;
 
         public CborMap(SortedMap<CborObject,? extends Cborable> values) {
@@ -119,6 +121,7 @@ public interface CborObject extends Cborable {
                             (a, b) -> a, TreeMap::new));
             return new CborMap(transformed);
         }
+
 
         @Override
         public void serialize(CborEncoder encoder) {
@@ -155,13 +158,46 @@ public interface CborObject extends Cborable {
         public int hashCode() {
             return values != null ? values.hashCode() : 0;
         }
+
+        public Cborable get(String key) {
+            return values.get(new CborString(key));
+        }
+
+        public String getString(String key) {
+            return ((CborString) get(key)).value;
+        }
+
+        public long getLong(String key) {
+            return ((CborLong) get(key)).value;
+        }
+
+        public CborList getList(String key) {
+            return (CborList) get(key);
+        }
+
+        public <T> T get(String key, Function<? super Cborable, T> fromCbor) {
+            return fromCbor.apply(get(key));
+        }
+
+        public <K,V> Map<K,V> getMap(Function<? super Cborable, K> toKey, Function<? super Cborable, V> toValue) {
+            return values.entrySet().stream()
+                .collect(Collectors.toMap(
+                    e -> toKey.apply(e.getKey()),
+                    e -> toValue.apply(e.getValue())
+                ));
+        }
     }
 
-    final class CborMerkleLink implements CborObject {
+    final class CborMerkleLink implements CborObject, Comparable<CborMerkleLink> {
         public final Multihash target;
 
         public CborMerkleLink(Multihash target) {
             this.target = target;
+        }
+
+        @Override
+        public int compareTo(CborMerkleLink that) {
+            return this.target.compareTo(that.target);
         }
 
         @Override
@@ -199,11 +235,17 @@ public interface CborObject extends Cborable {
         }
     }
 
-    final class CborList implements CborObject {
+    final class CborList implements CborObject, Cborable {
         public final List<? extends Cborable> value;
 
         public CborList(List<? extends Cborable> value) {
             this.value = value;
+        }
+
+        public CborList(Map<? extends Cborable, ? extends Cborable> map) {
+            this.value = map.entrySet().stream()
+                .flatMap(e -> Stream.of(e.getKey(), e.getValue()))
+                .collect(Collectors.toList());
         }
 
         @Override
@@ -238,6 +280,29 @@ public interface CborObject extends Cborable {
         @Override
         public int hashCode() {
             return value != null ? value.hashCode() : 0;
+        }
+
+        public <T> List<T> map(Function<? super Cborable, T> fromCbor) {
+            return value.stream()
+                .map(fromCbor)
+                .collect(Collectors.toList());
+        }
+
+        public <T> T get(int index, Function<? super Cborable, T> fromCbor) {
+            return fromCbor.apply(value.get(index));
+        }
+
+        public <K,V> Map<K, V> getMap(Function<? super Cborable, K> toKey, Function<? super Cborable, V> toValue) {
+            if (value.size() % 2 != 0)
+                throw new IllegalStateException();
+
+            Map<K, V> map = new HashMap<>();
+            for (int i = 0; i < value.size(); i += 2) {
+                K key = toKey.apply(value.get(i));
+                V _value = toValue.apply(value.get(i + 1));
+                map.put(key, _value);
+            }
+            return map;
         }
     }
 

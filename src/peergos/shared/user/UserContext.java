@@ -324,7 +324,11 @@ public class UserContext {
                                                                 NetworkAccess network) {
         System.out.println("renewing username: " + username + " with expiry " + expiry);
         List<UserPublicKeyLink> claimChain = UserPublicKeyLink.createInitial(signer, username, expiry);
-        return network.coreNode.updateChain(username, claimChain);
+
+        return network.coreNode.updateChain(username, claimChain).exceptionally(t  -> {
+                throw new IllegalStateException("Could not renew username-claim for user "+ username);
+        });
+
     }
 
     @JsMethod
